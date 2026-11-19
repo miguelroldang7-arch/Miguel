@@ -1,3 +1,5 @@
+package ticketfix.notificacion;
+
 public class NotificadorTicket {
     private EstrategiaNotificacion estrategia;
 
