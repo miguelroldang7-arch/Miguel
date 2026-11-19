@@ -15,3 +15,11 @@ public class NotificadorTicket {
         }
         estrategia.enviarNotificacion(mensaje);
     }
+
+    private static EstrategiaNotificacion validarEstrategia(EstrategiaNotificacion estrategia) {
+        if (estrategia == null) {
+            throw new IllegalArgumentException("La estrategia de notificacion no puede ser nula.");
+        }
+        return estrategia;
+    }
+}
