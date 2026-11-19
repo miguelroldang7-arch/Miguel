@@ -28,7 +28,7 @@ jobs:
       - name: Compilar codigo y pruebas
         run: |
           mkdir -p out
-          javac -encoding UTF-8 -cp "lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" -d out $(find ticketfix pruebas -name "*.java" 2>/dev/null)
+          javac -encoding UTF-8 -cp "lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" -d out $(find ticketfix pruebas -path "pruebas/version_original" -prune -o -path "pruebas/version_original2" -prune -o -name "*.java" -print)
 
       - name: Ejecutar pruebas con JUnit 4
         run: |
