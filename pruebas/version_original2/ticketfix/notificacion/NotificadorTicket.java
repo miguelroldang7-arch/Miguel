@@ -1,14 +1,32 @@
 package ticketfix.notificacion;
-// Copia de la version original (Unidad II, antes de Strategy).
-// Solo se le agrego el paquete y se renombro para compararla en la prueba de regresion.
-    public class NotificadorTicket {
-        public void notificar(String canal, String mensaje) {
-        if (canal.equals("EMAIL")) {
-            System.out.println("Enviando EMAIL: " + mensaje);
-        } else if (canal.equals("SMS")) {
-            System.out.println("Enviando SMS: " + mensaje);
-        } else {
-            throw new IllegalArgumentException("Canal no soportado: " + canal);
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class EstrategiaEspia implements EstrategiaNotificacion {
+    private final List<String> mensajesEnviados = new ArrayList<>();
+    public final List<String> recibidos = new ArrayList<>();
+    private int llamadas = 0;
+
+    @Override
+    public void enviarNotificacion(String mensaje) {
+        llamadas++;
+        mensajesEnviados.add(mensaje);
+        recibidos.add(mensaje);
+    }
+
+    public int getLlamadas() {
+        return llamadas;
+    }
+
+    public String getUltimoMensaje() {
+        if (mensajesEnviados.isEmpty()) {
+            return null;
         }
+        return mensajesEnviados.get(mensajesEnviados.size() - 1);
+    }
+
+    public List<String> getMensajesEnviados() {
+        return mensajesEnviados;
     }
 }
