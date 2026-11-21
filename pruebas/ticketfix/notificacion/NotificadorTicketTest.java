@@ -1,81 +1,97 @@
 package ticketfix.notificacion;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import org.junit.Test;
 
-// PRUEBAS UNITARIAS del contexto NotificadorTicket con una estrategia simulada (CP-04, CP-05).
+// Pruebas del modulo de notificaciones de TicketFix (patron Strategy).
+// Un caso de prueba (CP) por cada caso de uso del sistema que usa el modulo.
 public class NotificadorTicketTest {
 
-    // CP-04 / CU-04: el contexto delega en la estrategia activa y permite cambiarla
-    @Test
-    public void cp04_notificar_delegaUnaSolaVezEnLaEstrategia() {
-        EstrategiaEspia espia = new EstrategiaEspia();
-        new NotificadorTicket(espia).notificar("Ticket #20 creado.");
-        assertEquals(1, espia.recibidos.size());
-        assertEquals("Ticket #20 creado.", espia.recibidos.get(0));
-    }
-
-    @Test
-    public void cp04_setEstrategia_redirigeElSiguienteEnvio() {
-        EstrategiaEspia primera = new EstrategiaEspia();
-        EstrategiaEspia segunda = new EstrategiaEspia();
-        NotificadorTicket notificador = new NotificadorTicket(primera);
-        notificador.notificar("uno");
-        notificador.setEstrategia(segunda);
-        notificador.notificar("dos");
-        assertEquals(1, primera.recibidos.size());
-        assertEquals("dos", segunda.recibidos.get(0));
-    }
-
-    // CP-05 / CU-05: datos invalidos deben rechazarse antes de enviar
-    @Test
-    public void cp05_constructorConEstrategiaNula_lanzaIllegalArgumentException() {
+    // Captura lo que se imprime en consola mientras se ejecuta una accion.
+    private static String capturarConsola(Runnable accion) {
+        PrintStream original = System.out;
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(buffer));
         try {
-            new NotificadorTicket(null);
-            fail("Se esperaba IllegalArgumentException al crear el notificador sin estrategia");
-        } catch (IllegalArgumentException e) {
-            assertTrue(e.getMessage().contains("estrategia"));
+            accion.run();
+        } finally {
+            System.setOut(original);
         }
+        return buffer.toString().replace("\r", "");
     }
 
+    // CP-01 / Registrar solicitud de soporte (unitaria, escenario correcto)
     @Test
-    public void cp05_setEstrategiaNula_lanzaIllegalArgumentException() {
-        NotificadorTicket notificador = new NotificadorTicket(new EstrategiaEspia());
-        try {
-            notificador.setEstrategia(null);
-            fail("Se esperaba IllegalArgumentException al asignar una estrategia nula");
-        } catch (IllegalArgumentException e) {
-            assertTrue(e.getMessage().contains("estrategia"));
-        }
-    }
-
-    @Test
-    public void cp05_mensajeNulo_seRechazaYNoSeEnvia() {
-        verificarMensajeRechazado(null);
-    }
-
-    @Test
-    public void cp05_mensajeVacio_seRechazaYNoSeEnvia() {
-        verificarMensajeRechazado("");
-    }
-
-    @Test
-    public void cp05_mensajeSoloEspacios_seRechazaYNoSeEnvia() {
-        verificarMensajeRechazado("   ");
-    }
-
-    private void verificarMensajeRechazado(String mensaje) {
+    public void cp01_registrarSolicitud_mensajeValido() {
         EstrategiaEspia espia = new EstrategiaEspia();
         NotificadorTicket notificador = new NotificadorTicket(espia);
-        try {
-            notificador.notificar(mensaje);
-            fail("Se esperaba IllegalArgumentException para el mensaje [" + mensaje + "]");
-        } catch (IllegalArgumentException e) {
-            assertTrue(e.getMessage().contains("mensaje"));
-        }
-        assertEquals("No debe enviarse nada", 0, espia.recibidos.size());
+
+        notificador.notificar("Su ticket ha sido creado exitosamente.");
+
+        assertEquals(1, espia.recibidos.size());
+        assertEquals("Su ticket ha sido creado exitosamente.", espia.recibidos.get(0));
+    }
+
+    // CP-02 / Consultar estado de ticket (unitaria, datos invalidos)
+    @Test
+    public void cp02_consultarEstado_mensajeInvalido() {
+        EstrategiaEspia espia = new EstrategiaEspia();
+        NotificadorTicket notificador = new NotificadorTicket(espia);
+
+        assertThrows(IllegalArgumentException.class, () -> notificador.notificar(null));
+        assertThrows(IllegalArgumentException.class, () -> notificador.notificar(""));
+        assertThrows(IllegalArgumentException.class, () -> notificador.notificar("   "));
+        assertEquals("Ninguna notificacion invalida debe llegar al canal", 0, espia.recibidos.size());
+    }
+
+    // CP-03 / Recibir notificacion de cambio de estado (integracion: contexto + estrategias reales)
+    @Test
+    public void cp03_recibirNotificacion_cambioDeCanal() {
+        NotificadorTicket notificador = new NotificadorTicket(new NotificacionEmail());
+
+        String salida = capturarConsola(() -> {
+            notificador.notificar("Su ticket #16 cambio a EN PROGRESO.");
+            notificador.setEstrategia(new NotificacionSMS());
+            notificador.notificar("Su ticket #16 cambio a EN PROGRESO.");
+            notificador.setEstrategia(new NotificacionWhatsApp());
+            notificador.notificar("Su ticket #16 fue resuelto.");
+        });
+
+        assertEquals("Enviando EMAIL: Su ticket #16 cambio a EN PROGRESO.\n"
+                   + "Enviando SMS: Su ticket #16 cambio a EN PROGRESO.\n"
+                   + "Enviando WhatsApp: Su ticket #16 fue resuelto.\n", salida);
+    }
+
+    // CP-04 / Consultar historial de tickets resueltos (unitaria, situacion limite)
+    @Test
+    public void cp04_consultarHistorial_valoresLimite() {
+        EstrategiaEspia espia = new EstrategiaEspia();
+        NotificadorTicket notificador = new NotificadorTicket(espia);
+        String unCaracter = "A";
+        String muyLargo = "x".repeat(10000);
+
+        notificador.notificar(unCaracter);
+        notificador.notificar(muyLargo);
+
+        assertEquals(2, espia.recibidos.size());
+        assertEquals(unCaracter, espia.recibidos.get(0));
+        assertEquals(10000, espia.recibidos.get(1).length());
+    }
+
+    // CP-05 / Ver panel resumen de tickets (unitaria, datos invalidos: estrategia nula)
+    @Test
+    public void cp05_verPanel_estrategiaNula() {
+        assertThrows(IllegalArgumentException.class, () -> new NotificadorTicket(null));
+
+        EstrategiaEspia espia = new EstrategiaEspia();
+        NotificadorTicket notificador = new NotificadorTicket(espia);
+        assertThrows(IllegalArgumentException.class, () -> notificador.setEstrategia(null));
+
+        notificador.notificar("Resumen: 3 tickets abiertos.");
+        assertEquals("El canal anterior debe seguir activo", 1, espia.recibidos.size());
     }
 }
