@@ -25,11 +25,26 @@ jobs:
           curl -sL https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar -o lib/junit-4.13.2.jar
           curl -sL https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar -o lib/hamcrest-core-1.3.jar
 
-      - name: Compilar codigo y pruebas
+      - name: Etapa 1 - Compilar version sin correccion
         run: |
-          mkdir -p out
-          javac -encoding UTF-8 -cp "lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" -d out $(find ticketfix pruebas -path "pruebas/version_original" -prune -o -path "pruebas/version_original2" -prune -o -name "*.java" -print)
+          mkdir -p out_sin_correccion
+          javac -encoding UTF-8 -cp "lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" -d out_sin_correccion \
+            $(find ticketfix -name "*.java" ! -name "NotificadorTicket.java") \
+            pruebas/sin_correccion/ticketfix/notificacion/NotificadorTicket.java \
+            $(find pruebas/ticketfix/notificacion -maxdepth 1 -name "*.java")
 
-      - name: Ejecutar pruebas con JUnit 4
+      - name: Etapa 1 - Ejecutar pruebas (fallos esperados)
+        continue-on-error: true
         run: |
-          java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -cp "out:lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" org.junit.runner.JUnitCore ticketfix.notificacion.NotificadorTicketTest
+          java -cp "out_sin_correccion:lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" org.junit.runner.JUnitCore ticketfix.notificacion.NotificadorTicketTest
+
+      - name: Etapa 2 - Compilar version corregida
+        run: |
+          mkdir -p out_corregida
+          javac -encoding UTF-8 -cp "lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" -d out_corregida \
+            $(find ticketfix -name "*.java") \
+            $(find pruebas/ticketfix/notificacion -maxdepth 1 -name "*.java")
+
+      - name: Etapa 2 - Ejecutar pruebas (validacion final)
+        run: |
+          java -cp "out_corregida:lib/junit-4.13.2.jar:lib/hamcrest-core-1.3.jar" org.junit.runner.JUnitCore ticketfix.notificacion.NotificadorTicketTest
