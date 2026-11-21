@@ -13,6 +13,6 @@ public class NotificadorTicket {
     }
 
     public void notificar(String mensaje) {
-        estrategia.enviar(mensaje);
+        estrategia.enviarNotificacion(mensaje);
     }
 }
