@@ -29,12 +29,15 @@ jobs:
         run: |
           mkdir -p out_mejora
           javac -encoding UTF-8 -cp "lib/junit-4.13.2.jar:lib/hamcrest-core.1.3.jar" -d out_mejora \
-            $(find ticketfix -name "*.java") \
-            $(find pruebas/ticketfix/notificacion pruebas/mejora/ticketfix/notificacion -maxdepth 1 -name "*.java")
+            ticketfix/notificacion/*.java \
+            pruebas/ticketfix/notificacion/*.java \
+            pruebas/mejora/ticketfix/notificacion/*.java
 
       - name: Pruebas de regresion (5 originales) y de la mejora (4 nuevas)
         run: |
-          java -cp "out_mejora:lib/junit-4.13.2.jar:lib/hamcrest-core.1.3.jar" org.junit.runner.JUnitCore ticketfix.notificacion.NotificadorTicketTest ticketfix.notificacion.CanalTest
+          java -cp "out_mejora:lib/junit-4.13.2.jar:lib/hamcrest-core.1.3.jar" org.junit.runner.JUnitCore \
+            ticketfix.notificacion.NotificadorTicketTest \
+            ticketfix.notificacion.CanalTest
 
       - name: Ejecutar Main refactorizado
         run: |
