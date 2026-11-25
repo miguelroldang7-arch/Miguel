@@ -1,42 +1,95 @@
 package ticketfix.notificacion;
 
-public class NotificadorTicket {
-    private EstrategiaNotificacion estrategia;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
-    public NotificadorTicket(EstrategiaNotificacion estrategia) {
-        this.estrategia = validarEstrategia(estrategia);
-    }
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import org.junit.Test;
 
-    public static NotificadorTicket porCanal(Canal canal) {
-        return new NotificadorTicket(estrategiaDe(canal));
-    }
 
-    public void setEstrategia(EstrategiaNotificacion estrategia) {
-        this.estrategia = validarEstrategia(estrategia);
-    }
+public class NotificadorTicketTest {
 
-    public void setCanal(Canal canal) {
-        this.estrategia = estrategiaDe(canal);
-    }
 
-    public void notificar(String mensaje) {
-        if (mensaje == null || mensaje.trim().isEmpty()) {
-            throw new IllegalArgumentException("El mensaje de notificacion no puede estar vacio.");
+    private static String capturarConsola(Runnable accion) {
+        PrintStream original = System.out;
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(buffer));
+        try {
+            accion.run();
+        } finally {
+            System.setOut(original);
         }
-        estrategia.enviarNotificacion(mensaje);
+        return buffer.toString().replace("\r", "");
     }
 
-    private static EstrategiaNotificacion estrategiaDe(Canal canal) {
-        if (canal == null) {
-            throw new IllegalArgumentException("El canal de notificacion no puede ser nulo.");
-        }
-        return canal.estrategia();
+    @Test
+    public void cp01_registrarSolicitud_mensajeValido() {
+        EstrategiaEspia espia = new EstrategiaEspia();
+        NotificadorTicket notificador = new NotificadorTicket(espia);
+
+        notificador.notificar("Su ticket ha sido creado exitosamente.");
+
+        assertEquals(1, espia.recibidos.size());
+        assertEquals("Su ticket ha sido creado exitosamente.", espia.recibidos.get(0));
     }
 
-    private static EstrategiaNotificacion validarEstrategia(EstrategiaNotificacion estrategia) {
-        if (estrategia == null) {
-            throw new IllegalArgumentException("La estrategia de notificacion no puede ser nula.");
-        }
-        return estrategia;
+    
+    @Test
+    public void cp02_consultarEstado_mensajeInvalido() {
+        EstrategiaEspia espia = new EstrategiaEspia();
+        NotificadorTicket notificador = new NotificadorTicket(espia);
+
+        assertThrows(IllegalArgumentException.class, () -> notificador.notificar(null));
+        assertThrows(IllegalArgumentException.class, () -> notificador.notificar(""));
+        assertThrows(IllegalArgumentException.class, () -> notificador.notificar("   "));
+        assertEquals("Ninguna notificacion invalida debe llegar al canal", 0, espia.recibidos.size());
+    }
+
+
+    @Test
+    public void cp03_recibirNotificacion_cambioDeCanal() {
+        NotificadorTicket notificador = new NotificadorTicket(new NotificacionEmail());
+
+        String salida = capturarConsola(() -> {
+            notificador.notificar("Su ticket #16 cambio a EN PROGRESO.");
+            notificador.setEstrategia(new NotificacionSMS());
+            notificador.notificar("Su ticket #16 cambio a EN PROGRESO.");
+            notificador.setEstrategia(new NotificacionWhatsApp());
+            notificador.notificar("Su ticket #16 fue resuelto.");
+        });
+
+        assertEquals("Enviando EMAIL: Su ticket #16 cambio a EN PROGRESO.\n"
+                   + "Enviando SMS: Su ticket #16 cambio a EN PROGRESO.\n"
+                   + "Enviando WhatsApp: Su ticket #16 fue resuelto.\n", salida);
+    }
+
+ 
+    @Test
+    public void cp04_consultarHistorial_valoresLimite() {
+        EstrategiaEspia espia = new EstrategiaEspia();
+        NotificadorTicket notificador = new NotificadorTicket(espia);
+        String unCaracter = "A";
+        String muyLargo = "x".repeat(10000);
+
+        notificador.notificar(unCaracter);
+        notificador.notificar(muyLargo);
+
+        assertEquals(2, espia.recibidos.size());
+        assertEquals(unCaracter, espia.recibidos.get(0));
+        assertEquals(10000, espia.recibidos.get(1).length());
+    }
+
+
+    @Test
+    public void cp05_verPanel_estrategiaNula() {
+        assertThrows(IllegalArgumentException.class, () -> new NotificadorTicket(null));
+
+        EstrategiaEspia espia = new EstrategiaEspia();
+        NotificadorTicket notificador = new NotificadorTicket(espia);
+        assertThrows(IllegalArgumentException.class, () -> notificador.setEstrategia(null));
+
+        notificador.notificar("Resumen: 3 tickets abiertos.");
+        assertEquals("El canal anterior debe seguir activo", 1, espia.recibidos.size());
     }
 }
